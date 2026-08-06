@@ -118,19 +118,33 @@ From a default `sdr_demo` run, 16-QAM:
 | `cfloat<8,4>` | rx_matched | 8.63e-03 | 4.67e-03 |
 | `cfloat<8,4>` | whole_chain | 9.17e-03 | 5.61e-03 |
 
-The **constellation table is the single largest contributor at 8
-bits**, larger than either filter. That is not obvious in advance — the
-table is a handful of constants and the filters do thousands of
-multiply-accumulates — but the table's error is *systematic*: every
-symbol carrying that label lands at the same wrong place, so the errors
-do not average down the way filter rounding does.
+By this measure the **constellation table is the single largest
+contributor at 8 bits**, larger than either filter. The table's error is
+*systematic* — every symbol carrying a given label lands at the same
+wrong place — so it does not average down the way filter rounding does.
 
-Note also that `posit<8,2>` and `cfloat<8,4>` give **exactly the same
-1.17e-02** constellation contribution. Two very different formats
-producing identical numbers points at a shared bottleneck rather than
-at each format's own quantization; that observation is what
-[issue #209](https://github.com/stillwater-sc/mixed-precision-dsp/issues/209)
-exists to resolve.
+**That conclusion does not survive the move to real narrow arithmetic**,
+and the discrepancy is worth understanding before trusting either tool.
+`analyze_blocks` projects coefficients into the narrow type and computes
+in `double`, so what it calls the "constellation" block is *only* the
+table's quantization. Running the same link with the arithmetic actually
+narrow (see [the 8-bit study](#the-8-bit-result-resolved)) and varying
+the three scalars independently gives:
+
+| | `CoeffScalar` | `StateScalar` | `SampleScalar` | all three |
+|---|---|---|---|---|
+| `posit<8,2>` | 0.05 dB | **1.28 dB** | 0.19 dB | 1.28 dB |
+| `cfloat<8,4>` | 0.05 dB | **1.23 dB** | 0.18 dB | 1.23 dB |
+| `fixpnt<8,5>` | 0.15 dB | **0.82 dB** | 0.12 dB | 0.82 dB |
+
+The **accumulator** accounts for the entire loss, to two decimal places,
+in every case. The sample stream — which is where the quantized
+constellation actually enters a real chain — costs under 0.2 dB.
+
+The two tools are not contradicting each other; they are answering
+different questions. Attribution tells you which block's *stored values*
+are most sensitive. Real narrow arithmetic tells you where the *cost* is
+paid. Design decisions need the second.
 
 **A contribution of 0 is a resolution limit, not an exact result.** At
 16 bits the arithmetic sits an order of magnitude below the truncation
@@ -228,10 +242,11 @@ construction, and a tapered format spends bits on dynamic range the
 signal never uses. Posit's tapered precision buys nothing when nothing
 needs the dynamic range.
 
-This is not a disappointing result to be explained away. It is a
-sharper statement of when each format wins, and it identifies the
-condition — amplitude normalization — that the original premise
-silently assumed away.
+That explanation is sound as far as it goes, and it holds at 12 bits and
+above. **At 8 bits the table above does not survive scrutiny** — it
+carries one member of each family, and at that width the choice of
+member decides the answer. See [the 8-bit result,
+resolved](#the-8-bit-result-resolved).
 
 ## Where the tapered format does win: dynamic range
 
@@ -286,9 +301,11 @@ changes the finding instead of leaving a stale statement in the output.
 Practically:
 
 - **If your signal is reliably at full scale** and you control the
-  scaling, fixed-point at 8 bits is competitive and will beat an 8-bit
-  float or posit. Verify the binary point against the measured peak;
-  the demo prints a `clip%` column for exactly that check.
+  scaling, fixed-point is competitive at 8 bits — but pick the binary
+  point deliberately. `fixpnt<8,4>` costs 3.6 dB, `fixpnt<8,6>` costs
+  0.27 dB, and that 3.3 dB spread is far larger than any gap between
+  families. Verify against the measured peak; the demo prints a `clip%`
+  column for exactly that check.
 - **If your signal level is uncertain** — AGC still settling, variable
   path loss, high-PAPR waveform — the tapered formats hold EVM across
   24 to 48 dB more input range at the same width, and that is worth
@@ -299,27 +316,100 @@ Practically:
   the [channelizer](./channelizer/#precision-behaviour) and
   [OFDM](./ofdm/#fft-precision-and-subcarrier-orthogonality) pages show,
   `posit<32,2>` is 14–22 dB better than `float` at equal width.
+- **Spend width on the accumulator first.** The three-scalar factorial
+  puts essentially the whole 8-bit loss in `StateScalar`; coefficients
+  and the sample stream cost under 0.2 dB each. A design that widens the
+  converter interface before the accumulator is spending in the wrong
+  place.
 
-## An open question
+## The 8-bit result, resolved
 
-The 8-bit ordering above is **measured but not yet mechanistically
-explained**, and two things in the data are unresolved:
+```bash
+./build-ci/applications/sdr_demo/sdr_demo --study
+```
 
-- `posit<8,2>` and `cfloat<8,4>` land on the same 1.27 dB to three
-  digits, and on the same 1.17e-02 constellation contribution. Very
-  different formats producing identical numbers suggests a shared
-  bottleneck rather than each format's own quantization.
-- `fixpnt<8,5>` gets a hand-picked binary point; posit and cfloat have
-  no equivalent tuning knob. The measured waveform peak is ~0.8 with
-  `clip%` at 0.00, so its two integer bits are not earning their keep,
-  and `fixpnt<8,6>` may be better still.
-
+The 8-bit ordering above was measured but not mechanistically explained,
+and two things about it were suspicious: `posit<8,2>` and `cfloat<8,4>`
+agreed to three digits, and `fixpnt<8,5>` had a hand-picked binary point
+that the other two families have no equivalent of.
 [Issue #209](https://github.com/stillwater-sc/mixed-precision-dsp/issues/209)
-tracks a Q-point and `es` sweep across the whole 8-bit design space, a
-three-scalar factorial to localize the loss to `CoeffScalar` /
-`StateScalar` / `SampleScalar`, and loss-versus-$E_b/N_0$ curves.
-Treat the 8-bit row as a measurement awaiting a mechanism, not a
-settled property of the number systems.
+swept the whole 8-bit design space, ran a three-scalar factorial, and
+took loss-versus-$E_b/N_0$ curves. **The ordering did not survive.**
+
+### Every family has a usable 8-bit member
+
+16-QAM at the BER-$10^{-3}$ operating point, whole design space:
+
+| Config | loss | loss after AGC | BER | gain | Usable |
+|---|---|---|---|---|---|
+| `fixpnt<8,6>` | **0.27 dB** | 0.23 dB | 1.02e-03 | 1.015 | **yes** |
+| `posit<8,1>` | **0.36 dB** | 0.36 dB | 7.65e-04 | 1.006 | **yes** |
+| `cfloat<8,3>` | **0.48 dB** | 0.48 dB | 1.79e-03 | 1.004 | **yes** |
+| `fixpnt<8,5>` | 0.81 dB | 0.81 dB | 2.81e-03 | 0.997 | yes |
+| `cfloat<8,2>` | 0.81 dB | 0.81 dB | 2.81e-03 | 0.997 | yes |
+| `cfloat<8,4>` | 1.27 dB | 0.59 dB | 7.27e-03 | 0.935 | no |
+| `posit<8,2>` | 1.27 dB | 0.58 dB | 7.14e-03 | 0.935 | no |
+| `posit<8,0>` | 1.46 dB | 1.42 dB | 4.21e-03 | 1.016 | no |
+| `fixpnt<8,4>` | 3.82 dB | 2.68 dB | 6.89e-03 | 1.110 | no |
+| `fixpnt<8,7>` | −0.91 dB | −1.26 dB | 8.93e-04 | 0.963 | **limiting** |
+
+The original sweep carried `fixpnt<8,5>`, `posit<8,2>`, `posit<8,0>` and
+`cfloat<8,4>` — and simply did not include `posit<8,1>` or
+`cfloat<8,3>`, both of which beat every fixed-point member except
+`fixpnt<8,6>`. The **spread within each family** (fixpnt 3.35 dB, posit
+1.10 dB, cfloat 0.80 dB) dwarfs the 0.46 dB gap between families that
+drove the original conclusion. At 8 bits the exponent size or binary
+point is the dominant variable; **the family label is not**.
+
+### Why the two losers agreed to three digits
+
+`posit<8,2>` and `cfloat<8,4>` both leave **3 mantissa bits at unity
+amplitude**, so they quantize a unit-average-power constellation
+identically. It is a coincidence of parameterization, not a shared
+bottleneck — and the study confirms it by producing a second exact
+agreement with a different pair: `cfloat<8,2>` and `fixpnt<8,5>` both
+land on 0.81 dB with gain 0.997.
+
+### Most of that loss is a gain error an AGC removes
+
+Both losing rows show a fitted cloud gain of **0.935** — a 6.5%
+systematic compression, far more than symmetric rounding produces.
+Those formats round the constellation amplitudes *down* by the same
+relative amount, which is a gain error rather than random noise. Fit it
+out, as a receiver's AGC does for free, and `posit<8,2>` falls from
+1.27 dB to **0.58 dB** and `cfloat<8,4>` from 1.27 dB to **0.59 dB** —
+both comfortably inside the budget.
+
+The demo's chain has no AGC, so it charges that gain error as
+implementation loss. That is the right conservative default for a
+measurement harness, but it means **the raw loss overstates what these
+formats cost a real receiver.** Where the two columns agree, the loss is
+genuine precision loss.
+
+### `fixpnt<8,7>` is a metric trap
+
+It reports a **negative** implementation loss — apparently better than
+the `double` chain, which no precision effect can produce. Its range is
+$[-0.992, 0.992]$ and the waveform peaks near 0.97, so the datapath
+saturates: a **compressive nonlinearity** that clips the noise tail
+(lowering EVM) while pulling every symbol toward its decision boundary
+(raising BER). Against `fixpnt<8,6>` it measures 1.2 dB *better* on EVM
+and delivers a *worse* BER once the error count is large enough to
+resolve — 195 vs 199 errors at 40 000 symbols, with the gain sitting at
+0.962 rather than 1.0.
+
+The study flags such rows `LIMITING` and excludes them from the ranking.
+**A negative implementation loss is not a good result; it is a signal
+that EVM has stopped being a valid proxy**, which is why the study
+reports BER and fitted gain alongside it.
+
+### The ranking is stable in $E_b/N_0$
+
+Loss was measured from 6 dB below the operating point to 12 dB above.
+No pair swaps by more than 0.1 dB anywhere across that range, so the
+ordering is a property of the arithmetic rather than of where the 1 dB
+threshold happened to fall. What the original sweep got wrong was
+*which members it compared*, not *where it compared them*.
 
 ## CSV schema
 

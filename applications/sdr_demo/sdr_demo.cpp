@@ -150,6 +150,17 @@ struct ChainResult {
 	// rather than as a mysteriously bad EVM.
 	double      clip_fraction = 0.0;
 	double      peak_tx       = 0.0;   // largest transmit sample, absolute
+	// Fitted amplitude of the received cloud, and the EVM left once that gain
+	// (plus offset and rotation) is removed.
+	//
+	// These exist to catch a specific failure the EVM number alone hides. A
+	// saturating datapath is a COMPRESSIVE nonlinearity: it clips the noise
+	// tail, which lowers EVM, while pulling every symbol toward the decision
+	// boundary, which raises BER. The measurement then reports an arithmetic
+	// that looks BETTER than double. A gain visibly below 1 is what identifies
+	// that case as limiting rather than precision. See the 8-bit study.
+	double      gain          = 1.0;
+	double      residual_evm  = 0.0;
 	std::vector<std::complex<double>> constellation;
 };
 
@@ -277,6 +288,11 @@ ChainResult run_chain(const DemoParams& p, Modulation mod, double ebn0_db,
 	r.peak_tx       = peak;
 	r.clip_fraction = sample_count ? static_cast<double>(clipped) /
 	                                 static_cast<double>(sample_count) : 0.0;
+	// Structured part of the error: a compressive datapath shows up here as a
+	// gain below 1 long before it shows up anywhere else.
+	const auto iq = sdr::iq_imbalance<std::complex<double>>(want, got);
+	r.gain         = 0.5 * (iq.gain_i + iq.gain_q);
+	r.residual_evm = iq.residual_evm;
 	r.constellation = std::move(got);
 	return r;
 }
@@ -314,6 +330,9 @@ struct Reference {
 	// rather than a difference of draws.
 	double      evm_quiet  = 0.0;
 	double      evm_op     = 0.0;
+	// EVM at the operating point once gain, offset and rotation are fitted
+	// out — the part of the error an AGC and a carrier loop cannot remove.
+	double      evm_op_residual = 0.0;
 	// The theory check, run separately over many more symbols because a BER
 	// of 1e-3 needs them and the double chain can afford them.
 	double      ber_check  = 0.0;
@@ -569,7 +588,15 @@ void print_findings(const std::vector<SweepRow>& rows,
 		"  anomaly. The link is amplitude-normalized end to end, so the whole\n"
 		"  waveform lives in one octave and a uniform absolute step is exactly\n"
 		"  what an EVM measurement rewards. Posit's tapered precision buys\n"
-		"  nothing when nothing needs the dynamic range.\n";
+		"  nothing when nothing needs the dynamic range.\n"
+		"\n  READ THE 8-BIT ROW WITH CARE. This sweep carries one member of\n"
+		"  each family, and at 8 bits that choice decides the answer: --study\n"
+		"  runs the whole 8-bit design space and finds posit<8,1> and\n"
+		"  cfloat<8,3> both ahead of fixpnt<8,5>, with the spread INSIDE each\n"
+		"  family larger than the gap between them. It also finds that most of\n"
+		"  what the 8-bit floating rows lose here is a systematic gain error a\n"
+		"  receiver's AGC would remove. At 12 bits and above the choice of\n"
+		"  member stops mattering and this table stands as written.\n";
 
 	// 2. What that changes once the signal is not at full scale.
 	std::cout << "\n  Backoff each format tolerated before its EVM doubled:\n";
@@ -636,12 +663,612 @@ void write_constellations_csv(const std::string& path,
 }
 
 // ============================================================================
+// 8-bit study (Issue #209)
+// ============================================================================
+//
+// The main sweep found fixpnt<8,5> clearing the 1 dB implementation-loss
+// budget on 16-QAM while posit<8,2> and cfloat<8,4> did not. That result is a
+// measurement, not yet a mechanism, and two things about it were suspicious
+// enough to warrant a separate investigation:
+//
+//   * posit<8,2> and cfloat<8,4> landed on the SAME 1.27 dB to three digits,
+//     and on the same 1.17e-02 constellation contribution in the per-block
+//     breakdown. Two very different formats agreeing that precisely points at
+//     something they share rather than at each format's own quantization.
+//   * fixpnt<8,5> gets a hand-picked binary point. Posit and cfloat have no
+//     equivalent knob, so comparing one tuned member of one family against
+//     one untuned member of each other family is not a like-for-like test.
+//
+// Three measurements answer it. Each is a different cut through the same
+// chain, and none of them requires new signal-processing machinery — they all
+// run through run_chain(), which is already parameterized on the three
+// scalars independently.
+
+using q8r4 = sw::universal::fixpnt<8, 4, sw::universal::Saturate, std::uint8_t>;
+using q8r5 = sw::universal::fixpnt<8, 5, sw::universal::Saturate, std::uint8_t>;
+using q8r6 = sw::universal::fixpnt<8, 6, sw::universal::Saturate, std::uint8_t>;
+using q8r7 = sw::universal::fixpnt<8, 7, sw::universal::Saturate, std::uint8_t>;
+
+using p8e1 = sw::universal::posit<8, 1>;
+
+using cf8e2 = sw::universal::cfloat<8, 2, std::uint8_t, true, false, false>;
+using cf8e3 = sw::universal::cfloat<8, 3, std::uint8_t, true, false, false>;
+
+struct StudyRow {
+	std::string config;
+	std::string family;
+	double evm_arith     = 0.0;
+	double evm_op        = 0.0;
+	double loss_db       = 0.0;
+	double ber_op        = 0.0;
+	std::size_t bit_errors = 0;
+	double clip_fraction = 0.0;
+	double peak_tx       = 0.0;
+	double gain          = 1.0;
+	// Loss recomputed from the residual EVM: what is left after a receiver's
+	// AGC and carrier loop have removed the fitted gain, offset and rotation.
+	// A narrow format that merely rounds every amplitude DOWN produces a
+	// systematic gain error, and a real receiver corrects that for free —
+	// so the raw loss overstates what such a format actually costs.
+	double loss_fit_db   = 0.0;
+	bool   usable        = false;
+	// A datapath that saturates is a soft limiter: it clips the noise tail,
+	// so EVM IMPROVES on the double chain — a NEGATIVE implementation loss —
+	// while compressing every symbol toward its decision boundary, so BER
+	// degrades. When that happens the loss column has stopped measuring
+	// precision and the row must not be ranked on it.
+	bool   limiting      = false;
+};
+
+// --- A. the whole 8-bit design space --------------------------------------
+//
+// Every 8-bit member of every family, not one representative each. If
+// fixpnt's win survives against the best posit and the best cfloat, it is a
+// property of the number systems; if a different exponent size overturns it,
+// the original result was an artifact of which member happened to be swept.
+
+std::vector<StudyRow> study_design_space(const DemoParams& p, Modulation mod,
+                                          const Reference& ref) {
+	std::vector<StudyRow> rows;
+	auto add = [&](auto tag, const char* name, const char* family) {
+		using T = decltype(tag);
+		std::cout << "  measuring " << std::left << std::setw(14) << name
+		          << std::flush;
+		StudyRow r;
+		r.config = name;
+		r.family = family;
+		const auto quiet = run_chain<T, T, T>(p, mod, p.quiet_ebn0_db);
+		r.evm_arith = excess_evm(quiet.evm_rms, ref.evm_quiet);
+		const auto op = run_chain<T, T, T>(p, mod, ref.ebn0_op_db);
+		r.evm_op        = op.evm_rms;
+		r.ber_op        = op.ber;
+		r.bit_errors    = op.bit_errors;
+		r.clip_fraction = op.clip_fraction;
+		r.peak_tx       = op.peak_tx;
+		r.gain          = op.gain;
+		r.loss_db = (ref.evm_op > 0.0 && op.evm_rms > 0.0)
+			? 10.0 * std::log10((op.evm_rms * op.evm_rms) /
+			                    (ref.evm_op * ref.evm_op))
+			: 0.0;
+		// 2% of compression is far more than rounding can produce; past that
+		// the datapath is limiting, and neither the EVM nor the loss derived
+		// from it means what the column header says.
+		r.loss_fit_db = (ref.evm_op_residual > 0.0 && op.residual_evm > 0.0)
+			? 10.0 * std::log10((op.residual_evm * op.residual_evm) /
+			                    (ref.evm_op_residual * ref.evm_op_residual))
+			: 0.0;
+		// EVM better than the all-double chain cannot be a precision effect.
+		// It means the datapath is limiting, and the metric has broken.
+		r.limiting = (r.loss_db < 0.0);
+		r.usable = (r.loss_db <= p.loss_budget_db) && !r.limiting;
+		rows.push_back(std::move(r));
+		std::cout << "done\n";
+	};
+
+	add(q8r4{},  "fixpnt<8,4>",  "fixpnt");
+	add(q8r5{},  "fixpnt<8,5>",  "fixpnt");
+	add(q8r6{},  "fixpnt<8,6>",  "fixpnt");
+	add(q8r7{},  "fixpnt<8,7>",  "fixpnt");
+	add(p8e0{},  "posit<8,0>",   "posit");
+	add(p8e1{},  "posit<8,1>",   "posit");
+	add(p8{},    "posit<8,2>",   "posit");
+	add(cf8e2{}, "cfloat<8,2>",  "cfloat");
+	add(cf8e3{}, "cfloat<8,3>",  "cfloat");
+	add(cf8{},   "cfloat<8,4>",  "cfloat");
+	return rows;
+}
+
+void print_design_space(const std::vector<StudyRow>& rows, double budget_db) {
+	std::cout << "\n" << std::string(104, '=') << "\n";
+	std::cout << "  A. The whole 8-bit design space, 16-QAM at the operating point\n";
+	std::cout << std::string(104, '=') << "\n";
+	std::cout << std::left << std::setw(15) << "Number system"
+	          << std::right << std::setw(12) << "EVM arith"
+	          << std::right << std::setw(11) << "EVM @op"
+	          << std::right << std::setw(10) << "loss(dB)"
+	          << std::right << std::setw(11) << "loss_agc"
+	          << std::right << std::setw(12) << "BER"
+	          << std::right << std::setw(8)  << "errs"
+	          << std::right << std::setw(8)  << "gain"
+	          << std::right << std::setw(8)  << "clip%"
+	          << std::right << std::setw(12) << "usable" << "\n";
+	std::cout << std::string(104, '-') << "\n";
+	bool any_limiting = false;
+	for (const auto& r : rows) {
+		std::cout << std::left << std::setw(15) << r.config
+		          << std::right << std::setw(12) << fmt_sci(r.evm_arith)
+		          << std::right << std::setw(11) << std::fixed << std::setprecision(4) << r.evm_op
+		          << std::right << std::setw(10) << std::fixed << std::setprecision(2) << r.loss_db
+		          << std::right << std::setw(11) << std::fixed << std::setprecision(2) << r.loss_fit_db
+		          << std::right << std::setw(12) << fmt_sci(r.ber_op)
+		          << std::right << std::setw(8)  << r.bit_errors
+		          << std::right << std::setw(8)  << std::fixed << std::setprecision(3) << r.gain
+		          << std::right << std::setw(8)  << std::fixed << std::setprecision(2)
+		                                         << (100.0 * r.clip_fraction)
+		          << std::right << std::setw(12)
+		          << (r.limiting ? "LIMITING" : (r.usable ? "yes" : "NO")) << "\n";
+		if (r.limiting) any_limiting = true;
+	}
+	std::cout << std::string(104, '-') << "\n";
+	std::cout << "  usable = implementation loss <= " << std::fixed
+	          << std::setprecision(1) << budget_db << " dB AND the datapath is "
+	             "not limiting.\n"
+	             "  loss_agc = the same loss recomputed after the fitted gain, "
+	             "offset and rotation are\n  removed — what remains once a "
+	             "receiver's AGC and carrier loop have done their job. gain is\n"
+	             "  that fitted amplitude; clip% is transmit samples the type "
+	             "could not hold.\n";
+	if (any_limiting) {
+		std::cout << "\n  LIMITING marks a saturating datapath, and it is the "
+		             "reason this table reports BER and\n  gain rather than "
+		             "EVM alone. Saturation is a COMPRESSIVE nonlinearity: it "
+		             "clips the noise\n  tail, which LOWERS EVM — a negative "
+		             "implementation loss, i.e. apparently better than\n  the "
+		             "double chain — while pulling every symbol toward its "
+		             "decision boundary, which RAISES\n  BER. Read the BER "
+		             "column on those rows; the loss column is not measuring "
+		             "precision.\n";
+	}
+}
+
+// --- B. which of the three scalars spends the loss -------------------------
+//
+// The three-scalar parameterization exists precisely so this question can be
+// asked. Narrowing one slot at a time and holding the other two at double
+// says whether an 8-bit link is limited by its stored coefficients, by its
+// accumulator, or by the sample stream at the converter interface — three
+// findings with completely different design consequences.
+
+struct FactorialRow {
+	std::string config;
+	bool narrow_coeff = false, narrow_state = false, narrow_sample = false;
+	double evm_op  = 0.0;
+	double loss_db = 0.0;
+};
+
+template <typename T>
+std::vector<FactorialRow> study_factorial_for(const DemoParams& p, Modulation mod,
+                                               const Reference& ref,
+                                               const char* name) {
+	std::vector<FactorialRow> rows;
+	auto one = [&](auto c_tag, auto s_tag, auto x_tag,
+	               bool nc, bool ns, bool nx) {
+		using C = decltype(c_tag);
+		using S = decltype(s_tag);
+		using X = decltype(x_tag);
+		FactorialRow r;
+		r.config = name;
+		r.narrow_coeff = nc; r.narrow_state = ns; r.narrow_sample = nx;
+		const auto op = run_chain<C, S, X>(p, mod, ref.ebn0_op_db);
+		r.evm_op  = op.evm_rms;
+		r.loss_db = (ref.evm_op > 0.0 && op.evm_rms > 0.0)
+			? 10.0 * std::log10((op.evm_rms * op.evm_rms) /
+			                    (ref.evm_op * ref.evm_op))
+			: 0.0;
+		rows.push_back(std::move(r));
+	};
+
+	// All eight corners. Written out rather than generated: the point of the
+	// measurement is that each corner is a specific, nameable configuration.
+	one(double{}, double{}, double{}, false, false, false);
+	one(T{},      double{}, double{}, true,  false, false);
+	one(double{}, T{},      double{}, false, true,  false);
+	one(double{}, double{}, T{},      false, false, true);
+	one(T{},      T{},      double{}, true,  true,  false);
+	one(T{},      double{}, T{},      true,  false, true);
+	one(double{}, T{},      T{},      false, true,  true);
+	one(T{},      T{},      T{},      true,  true,  true);
+	return rows;
+}
+
+void print_factorial(const std::vector<FactorialRow>& rows, double budget_db) {
+	std::cout << "\n" << std::string(96, '=') << "\n";
+	std::cout << "  B. Which scalar spends the loss — one slot narrowed at a time\n";
+	std::cout << std::string(96, '=') << "\n";
+	std::cout << std::left << std::setw(16) << "Number system"
+	          << std::right << std::setw(8)  << "Coeff"
+	          << std::right << std::setw(8)  << "State"
+	          << std::right << std::setw(9)  << "Sample"
+	          << std::right << std::setw(12) << "EVM @op"
+	          << std::right << std::setw(11) << "loss(dB)"
+	          << std::right << std::setw(10) << "usable" << "\n";
+	std::cout << std::string(96, '-') << "\n";
+	std::string last;
+	for (const auto& r : rows) {
+		if (r.config != last && !last.empty()) std::cout << "\n";
+		std::cout << std::left << std::setw(16) << (r.config == last ? "" : r.config)
+		          << std::right << std::setw(8)  << (r.narrow_coeff  ? "narrow" : "double")
+		          << std::right << std::setw(8)  << (r.narrow_state  ? "narrow" : "double")
+		          << std::right << std::setw(9)  << (r.narrow_sample ? "narrow" : "double")
+		          << std::right << std::setw(12) << std::fixed << std::setprecision(4) << r.evm_op
+		          << std::right << std::setw(11) << std::fixed << std::setprecision(2) << r.loss_db
+		          << std::right << std::setw(10)
+		          << ((r.loss_db <= budget_db) ? "yes" : "NO") << "\n";
+		last = r.config;
+	}
+	std::cout << std::string(96, '-') << "\n";
+	std::cout << "  Coeff = the RRC tap set. State = the filter accumulators.\n"
+	             "  Sample = the symbol and waveform stream, i.e. the converter "
+	             "interface.\n";
+}
+
+// --- C. does the ranking survive the operating point? ----------------------
+//
+// The headline loss is measured at one Eb/N0. If fixpnt's advantage shrinks
+// as the channel quietens, the sweep was measuring an interaction with the
+// noise rather than the arithmetic, and the 1 dB threshold happened to fall
+// where fixpnt was ahead.
+
+struct CurveRow {
+	std::string config;
+	std::vector<double> loss_db;   // one per offset
+};
+
+const double kEbn0Offsets[] = {-6.0, -3.0, 0.0, 3.0, 6.0, 12.0};
+
+template <typename T>
+CurveRow study_curve_for(const DemoParams& p, Modulation mod,
+                          const Reference& ref, const char* name) {
+	CurveRow r;
+	r.config = name;
+	for (double off : kEbn0Offsets) {
+		const double ebn0 = ref.ebn0_op_db + off;
+		const auto base   = run_chain<double, double, double>(p, mod, ebn0);
+		const auto narrow = run_chain<T, T, T>(p, mod, ebn0);
+		r.loss_db.push_back(
+			(base.evm_rms > 0.0 && narrow.evm_rms > 0.0)
+				? 10.0 * std::log10((narrow.evm_rms * narrow.evm_rms) /
+				                    (base.evm_rms * base.evm_rms))
+				: 0.0);
+	}
+	return r;
+}
+
+void print_curves(const std::vector<CurveRow>& rows, double op_db) {
+	std::cout << "\n" << std::string(96, '=') << "\n";
+	std::cout << "  C. Implementation loss against the operating point, 16-QAM\n";
+	std::cout << std::string(96, '=') << "\n";
+	std::cout << std::left << std::setw(16) << "Number system";
+	for (double off : kEbn0Offsets) {
+		std::ostringstream os;
+		os << std::fixed << std::setprecision(1) << (op_db + off) << " dB";
+		std::cout << std::right << std::setw(12) << os.str();
+	}
+	std::cout << "\n" << std::string(96, '-') << "\n";
+	for (const auto& r : rows) {
+		std::cout << std::left << std::setw(16) << r.config;
+		for (double v : r.loss_db)
+			std::cout << std::right << std::setw(12) << std::fixed
+			          << std::setprecision(2) << v;
+		std::cout << "\n";
+	}
+	std::cout << std::string(96, '-') << "\n";
+	std::cout << "  The operating point is " << std::fixed << std::setprecision(2)
+	          << op_db << " dB, the centre column. Loss is measured against a\n"
+	             "  double chain run at the SAME Eb/N0 and seed, so the channel "
+	             "cancels and what\n  moves across a row is the arithmetic's "
+	             "share of the total error.\n";
+}
+
+void write_study_csv(const std::string& path,
+                     const std::vector<StudyRow>& space,
+                     const std::vector<FactorialRow>& fact,
+                     const std::vector<CurveRow>& curves,
+                     double op_db) {
+	std::ofstream out(path);
+	if (!out) throw std::runtime_error("cannot open " + path);
+	out << "study,config,family,narrow_coeff,narrow_state,narrow_sample,"
+	       "ebn0_db,evm_arith,evm_op,loss_db,ber_op,bit_errors,gain,"
+	       "clip_fraction,peak_tx,limiting,usable\n";
+	out << std::setprecision(15);
+	for (const auto& r : space)
+		out << "design_space," << r.config << "," << r.family << ",1,1,1,"
+		    << op_db << "," << r.evm_arith << "," << r.evm_op << ","
+		    << r.loss_db << "," << r.ber_op << "," << r.bit_errors << ","
+		    << r.gain << "," << r.clip_fraction << "," << r.peak_tx << ","
+		    << (r.limiting ? 1 : 0) << "," << (r.usable ? 1 : 0) << "\n";
+	for (const auto& r : fact)
+		out << "factorial," << r.config << ",," << (r.narrow_coeff ? 1 : 0) << ","
+		    << (r.narrow_state ? 1 : 0) << "," << (r.narrow_sample ? 1 : 0) << ","
+		    << op_db << ",," << r.evm_op << "," << r.loss_db << ",,,,,,,\n";
+	for (const auto& r : curves)
+		for (std::size_t i = 0; i < r.loss_db.size(); ++i)
+			out << "curve," << r.config << ",,1,1,1,"
+			    << (op_db + kEbn0Offsets[i]) << ",,," << r.loss_db[i]
+			    << ",,,,,,,\n";
+}
+
+// What the three measurements say, derived from them rather than restated
+// from a previous run. Changing the sweep parameters changes this text.
+void print_study_findings(const std::vector<StudyRow>& space,
+                          const std::vector<FactorialRow>& fact,
+                          const std::vector<CurveRow>& curves,
+                          double budget_db) {
+	std::cout << "\n" << std::string(96, '=') << "\n";
+	std::cout << "  What the study found\n";
+	std::cout << std::string(96, '=') << "\n";
+
+	// A: best member of each family, and whether the families still separate.
+	std::cout << "\n  Best 8-bit member of each family:\n";
+	// Limiting configurations are excluded. Their loss is the lowest in the
+	// table precisely because saturation suppressed the noise, so ranking on
+	// it would promote the one row where the metric has stopped working.
+	std::map<std::string, const StudyRow*> best;
+	std::vector<const StudyRow*> limiting;
+	for (const auto& r : space) {
+		if (r.limiting) { limiting.push_back(&r); continue; }
+		auto it = best.find(r.family);
+		if (it == best.end() || r.loss_db < it->second->loss_db)
+			best[r.family] = &r;
+	}
+	const StudyRow* overall = nullptr;
+	for (const auto& [fam, r] : best) {
+		std::cout << "    " << std::left << std::setw(10) << fam
+		          << std::right << std::setw(14) << r->config
+		          << std::right << std::setw(9) << std::fixed
+		          << std::setprecision(2) << r->loss_db << " dB   "
+		          << (r->usable ? "usable" : "NOT usable") << "\n";
+		if (!overall || r->loss_db < overall->loss_db) overall = r;
+	}
+
+	if (!limiting.empty()) {
+		std::cout << "\n  Excluded as limiting (saturating datapath, so EVM "
+		             "understates the damage):\n";
+		for (const auto* r : limiting)
+			std::cout << "    " << std::left << std::setw(14) << r->config
+			          << "loss " << std::fixed << std::setprecision(2)
+			          << r->loss_db << " dB but gain " << std::setprecision(3)
+			          << r->gain << " and BER " << fmt_sci(r->ber_op) << "\n";
+	}
+
+	std::size_t families_usable = 0;
+	for (const auto& [fam, r] : best) if (r->usable) ++families_usable;
+	std::cout << "\n";
+	if (families_usable == best.size()) {
+		std::cout << "  Every family has an 8-bit member inside the "
+		          << std::fixed << std::setprecision(1) << budget_db
+		          << " dB budget, so the\n  original \"only fixpnt carries "
+		             "16-QAM at 8 bits\" result was a statement\n  about which "
+		             "member was swept, not about the number systems.\n";
+	} else if (families_usable == 1) {
+		std::cout << "  Only " << overall->family << " has an 8-bit member "
+		             "inside the budget, and that holds\n  across the whole "
+		             "design space rather than for one tuned member — the "
+		             "original\n  result survives.\n";
+	} else {
+		std::cout << "  " << families_usable << " of " << best.size()
+		          << " families have an 8-bit member inside the budget. The "
+		             "ranking is\n  narrower than the original sweep suggested "
+		             "but does not vanish.\n";
+	}
+
+	// A, continued: how much the choice of member is worth inside a family.
+	std::cout << "\n  Spread within each family (worst member minus best):\n";
+	std::map<std::string, std::pair<double, double>> range;
+	for (const auto& r : space) {
+		if (r.limiting) continue;
+		auto it = range.find(r.family);
+		if (it == range.end()) range[r.family] = {r.loss_db, r.loss_db};
+		else {
+			it->second.first  = std::min(it->second.first, r.loss_db);
+			it->second.second = std::max(it->second.second, r.loss_db);
+		}
+	}
+	for (const auto& [fam, lohi] : range)
+		std::cout << "    " << std::left << std::setw(10) << fam
+		          << std::right << std::setw(8) << std::fixed
+		          << std::setprecision(2) << (lohi.second - lohi.first)
+		          << " dB\n";
+	std::cout << "\n  Compare that against the gap the original sweep reported "
+	             "between families.\n  Where the within-family spread is the "
+	             "larger number, the exponent size or\n  binary point is the "
+	             "dominant variable and the family label is not.\n";
+
+	// How much of each loss is a systematic gain error rather than random
+	// precision loss. This is the difference between a format that a receiver
+	// can compensate for and one it cannot.
+	std::cout << "\n  How much of the loss an AGC would remove:\n";
+	for (const auto& r : space) {
+		if (r.limiting) continue;
+		const double removable = r.loss_db - r.loss_fit_db;
+		if (removable < 0.05) continue;
+		std::cout << "    " << std::left << std::setw(14) << r.config
+		          << std::fixed << std::setprecision(2) << r.loss_db
+		          << " dB raw -> " << r.loss_fit_db << " dB after the fitted "
+		             "gain (" << std::setprecision(3) << r.gain
+		          << ") is removed\n";
+	}
+	std::cout << "    A format that rounds every amplitude the same way "
+	             "produces a systematic gain\n    error, not random noise, and "
+	             "a receiver's AGC corrects it for free. Where the two\n"
+	             "    columns differ, the raw implementation loss overstates "
+	             "what the format costs a\n    real link — and where they "
+	             "agree, the loss is genuine precision loss.\n";
+
+	// B: which scalar dominates.
+	std::cout << "\n  Where the loss is spent (single-slot corners):\n";
+	std::string cfg;
+	for (const auto& r : fact) {
+		if (r.config == cfg) continue;
+		cfg = r.config;
+		const FactorialRow *c = nullptr, *s = nullptr, *x = nullptr, *all = nullptr;
+		for (const auto& q : fact) {
+			if (q.config != cfg) continue;
+			const int n = (q.narrow_coeff ? 1 : 0) + (q.narrow_state ? 1 : 0) +
+			              (q.narrow_sample ? 1 : 0);
+			if (n == 1 && q.narrow_coeff)  c = &q;
+			if (n == 1 && q.narrow_state)  s = &q;
+			if (n == 1 && q.narrow_sample) x = &q;
+			if (n == 3) all = &q;
+		}
+		if (!c || !s || !x || !all) continue;
+		const char* worst = "coeff";
+		double worst_v = c->loss_db;
+		if (s->loss_db > worst_v) { worst_v = s->loss_db; worst = "state"; }
+		if (x->loss_db > worst_v) { worst_v = x->loss_db; worst = "sample"; }
+		std::cout << "    " << std::left << std::setw(14) << cfg
+		          << "coeff " << std::fixed << std::setprecision(2) << c->loss_db
+		          << " dB, state " << s->loss_db
+		          << " dB, sample " << x->loss_db
+		          << " dB -> all " << all->loss_db << " dB"
+		          << "  (dominant: " << worst << ")\n";
+	}
+
+	// C: does the ordering hold across the operating point?
+	//
+	// Only a MATERIAL swap counts. Two configurations whose losses differ by
+	// less than the tolerance below are tied, and a tie flipping between
+	// columns is sampling noise, not a reordering — reporting it as one would
+	// turn a stable result into a spurious warning every run.
+	const double kTieDb = 0.10;
+	std::cout << "\n  Ranking against Eb/N0:\n";
+	if (!curves.empty()) {
+		const std::size_t n = curves.front().loss_db.size();
+		std::vector<std::pair<double, std::string>> ref_order;
+		for (const auto& r : curves) ref_order.push_back({r.loss_db[0], r.config});
+		std::sort(ref_order.begin(), ref_order.end());
+
+		std::vector<std::string> swaps;
+		for (std::size_t i = 1; i < n; ++i)
+			for (std::size_t a = 0; a < ref_order.size(); ++a)
+				for (std::size_t b = a + 1; b < ref_order.size(); ++b) {
+					auto loss_of = [&](const std::string& cfg) {
+						for (const auto& r : curves)
+							if (r.config == cfg) return r.loss_db[i];
+						return 0.0;
+					};
+					const double la = loss_of(ref_order[a].second);
+					const double lb = loss_of(ref_order[b].second);
+					// a was ahead of b at the first column; a material swap is
+					// b now ahead by more than the tie width.
+					if (la - lb > kTieDb)
+						swaps.push_back(ref_order[b].second + " overtakes " +
+						                ref_order[a].second);
+				}
+
+		std::cout << "    at " << std::fixed << std::setprecision(1)
+		          << kEbn0Offsets[0] << " dB from the operating point the order "
+		             "is: ";
+		for (std::size_t i = 0; i < ref_order.size(); ++i)
+			std::cout << (i ? " < " : "") << ref_order[i].second;
+		std::cout << "\n";
+		if (swaps.empty()) {
+			std::cout << "    and no pair swaps by more than " << std::fixed
+			          << std::setprecision(2) << kTieDb << " dB anywhere across "
+			             "the range, so the ranking is a\n    property of the "
+			             "arithmetic rather than of where the threshold fell.\n";
+		} else {
+			std::cout << "    but the order CHANGES materially across the range:\n";
+			std::sort(swaps.begin(), swaps.end());
+			swaps.erase(std::unique(swaps.begin(), swaps.end()), swaps.end());
+			for (const auto& sw : swaps) std::cout << "      " << sw << "\n";
+			std::cout << "    so the headline ordering depended on the operating "
+			             "point it was read at.\n";
+		}
+	}
+}
+
+// The whole study, start to finish.
+void run_study(const DemoParams& p, const std::string& csv_dir) {
+	const Modulation mod = Modulation::qam16;
+
+	std::cout << std::string(96, '=') << "\n";
+	std::cout << "  8-bit study — why fixpnt<8,5> cleared the budget and "
+	             "posit<8,2>/cfloat<8,4> did not\n";
+	std::cout << "  Issue #209, following from #104.  16-QAM, "
+	          << p.num_symbols << " symbols, seed " << p.seed << "\n";
+	std::cout << std::string(96, '=') << "\n";
+
+	// The same reference the main sweep uses: the all-double chain at this
+	// modulation, measured at the sweep's own symbol count and seed so the
+	// narrow runs see the same noise realization.
+	Reference ref;
+	ref.ebn0_op_db = ebn0_for_ber(mod, p.target_ber);
+	ref.evm_quiet  = run_chain<double, double, double>(p, mod, p.quiet_ebn0_db).evm_rms;
+	{
+		const auto r = run_chain<double, double, double>(p, mod, ref.ebn0_op_db);
+		ref.evm_op          = r.evm_rms;
+		ref.evm_op_residual = r.residual_evm;
+	}
+	std::cout << "\n  Reference (all-double): operating point Eb/N0 = "
+	          << std::fixed << std::setprecision(2) << ref.ebn0_op_db
+	          << " dB, EVM " << std::setprecision(4) << ref.evm_op
+	          << ", quiet EVM " << fmt_sci(ref.evm_quiet) << "\n\n";
+
+	const auto space = study_design_space(p, mod, ref);
+	print_design_space(space, p.loss_budget_db);
+
+	// The factorial runs on one member of each family — the best one study A
+	// found, so the comparison is between each family's strongest showing
+	// rather than between arbitrary members.
+	std::cout << "\n  Running the three-scalar factorial";
+	std::vector<FactorialRow> fact;
+	auto append = [&](std::vector<FactorialRow> v) {
+		fact.insert(fact.end(), v.begin(), v.end());
+		std::cout << "." << std::flush;
+	};
+	append(study_factorial_for<q8r5> (p, mod, ref, "fixpnt<8,5>"));
+	append(study_factorial_for<q8r6> (p, mod, ref, "fixpnt<8,6>"));
+	append(study_factorial_for<p8>   (p, mod, ref, "posit<8,2>"));
+	append(study_factorial_for<p8e1> (p, mod, ref, "posit<8,1>"));
+	append(study_factorial_for<cf8>  (p, mod, ref, "cfloat<8,4>"));
+	append(study_factorial_for<cf8e3>(p, mod, ref, "cfloat<8,3>"));
+	std::cout << " done\n";
+	print_factorial(fact, p.loss_budget_db);
+
+	std::cout << "\n  Running the Eb/N0 curves";
+	std::vector<CurveRow> curves;
+	auto curve = [&](CurveRow r) {
+		curves.push_back(std::move(r));
+		std::cout << "." << std::flush;
+	};
+	curve(study_curve_for<q8r5> (p, mod, ref, "fixpnt<8,5>"));
+	curve(study_curve_for<q8r6> (p, mod, ref, "fixpnt<8,6>"));
+	curve(study_curve_for<p8>   (p, mod, ref, "posit<8,2>"));
+	curve(study_curve_for<p8e1> (p, mod, ref, "posit<8,1>"));
+	curve(study_curve_for<cf8>  (p, mod, ref, "cfloat<8,4>"));
+	curve(study_curve_for<cf8e3>(p, mod, ref, "cfloat<8,3>"));
+	std::cout << " done\n";
+	print_curves(curves, ref.ebn0_op_db);
+
+	print_study_findings(space, fact, curves, p.loss_budget_db);
+
+	const std::string path = csv_dir + "/sdr_demo_study.csv";
+	write_study_csv(path, space, fact, curves, ref.ebn0_op_db);
+	std::cout << "\n" << std::string(96, '=') << "\n";
+	std::cout << "  study CSV: " << path << "\n";
+	std::cout << std::string(96, '=') << "\n";
+}
+
+// ============================================================================
 // Argument handling
 // ============================================================================
 
 void print_usage(const char* argv0) {
 	std::cout <<
 		"Usage: " << argv0 << " [options]\n"
+		"  --study            run the 8-bit investigation (issue #209) instead\n"
+		"                     of the standard sweep\n"
 		"  --symbols=N        symbols per measurement   (default 2000)\n"
 		"  --ber-symbols=N    symbols for the double-chain theory check (default 60000)\n"
 		"  --sps=N            samples per symbol        (default 4)\n"
@@ -684,11 +1311,13 @@ std::size_t parse_size(const std::string& s, const char* flag) {
 int main(int argc, char* argv[]) {
 	DemoParams p;
 	std::string csv_dir = sw::dsp::demo::output_dir();
+	bool study = false;
 
 	try {
 		for (int i = 1; i < argc; ++i) {
 			const std::string a = argv[i];
 			if (a == "--help" || a == "-h") { print_usage(argv[0]); return 0; }
+			else if (a == "--study")                    study = true;
 			else if (a.rfind("--symbols=", 0) == 0)     p.num_symbols = parse_size(a.substr(10), "--symbols");
 			else if (a.rfind("--ber-symbols=", 0) == 0) p.ber_symbols = parse_size(a.substr(14), "--ber-symbols");
 			else if (a.rfind("--sps=", 0) == 0)         p.samples_per_symbol = parse_size(a.substr(6), "--sps");
@@ -721,6 +1350,16 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 	if (!csv_dir.empty() && csv_dir.back() == '/') csv_dir.pop_back();
+
+	if (study) {
+		try {
+			run_study(p, csv_dir);
+			return 0;
+		} catch (const std::exception& ex) {
+			std::cerr << "Error: " << ex.what() << "\n";
+			return 1;
+		}
+	}
 
 	try {
 		std::cout << std::string(104, '=') << "\n";
