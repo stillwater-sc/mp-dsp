@@ -10,6 +10,12 @@ those are summarized from their release commits and are intentionally terse.
 
 ## [Unreleased]
 
+**Milestone v0.10 — Software Defined Radio — is complete.** Epic #85 and all
+eleven of its sub-issues (#95–#105) are closed, along with #208 and #209. The
+epic's stated premise did not survive its own capstone measurement: see the
+`applications/sdr_demo` and `--study` entries below, and the correction
+recorded on #85. Not yet released; `version.hpp` still reads 0.9.0.
+
 ### Added
 
 - `applications/sdr_demo --study`: the 8-bit investigation (#209, follows
