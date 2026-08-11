@@ -12,6 +12,60 @@ those are summarized from their release commits and are intentionally terse.
 
 ### Added
 
+- `applications/sdr_demo --study`: the 8-bit investigation (#209, follows
+  from #104). Sweeps the whole 8-bit design space — `fixpnt<8,4..7>`,
+  `posit<8,0..2>`, `cfloat<8,2..4>` — runs a three-scalar factorial over all
+  eight narrow/double corners of `CoeffScalar`/`StateScalar`/`SampleScalar`,
+  and takes loss-versus-Eb/N0 curves from 6 dB below the operating point to
+  12 dB above. Writes `sdr_demo_study.csv`. The standard sweep is unchanged;
+  `--study` runs the investigation instead.
+
+  **The 8-bit ordering from #104 did not survive.** `posit<8,1>` (0.36 dB)
+  and `cfloat<8,3>` (0.48 dB) both beat `fixpnt<8,5>` (0.81 dB), and neither
+  was in the original sweep. The spread *within* each family — fixpnt
+  3.35 dB, posit 1.10 dB, cfloat 0.80 dB — dwarfs the 0.46 dB gap between
+  families that drove the original conclusion. At 8 bits the exponent size or
+  binary point is the dominant variable and the family label is not.
+
+  `posit<8,2>` and `cfloat<8,4>` agreed to three digits because both leave
+  **3 mantissa bits at unity amplitude**, so they quantize a
+  unit-average-power constellation identically — a coincidence of
+  parameterization, not the shared bottleneck it looked like. The study
+  reproduces the effect with a second pair: `cfloat<8,2>` and `fixpnt<8,5>`
+  also land on exactly 0.81 dB.
+
+  **Most of what those two lose is a systematic gain error, not precision.**
+  Both show a fitted cloud gain of 0.935 — they round the constellation
+  amplitudes down by the same relative amount. Fitting that out, as a
+  receiver's AGC does for free, drops `posit<8,2>` from 1.27 dB to 0.58 dB
+  and `cfloat<8,4>` from 1.27 dB to 0.59 dB, both inside the budget. The
+  table now reports raw loss and AGC-corrected loss side by side.
+
+  **`fixpnt<8,7>` is a metric trap.** It reports a *negative* implementation
+  loss — better than the double chain, which no precision effect can produce.
+  Its range is +/-0.992 against a waveform peaking near 0.97, so the datapath
+  saturates: a compressive nonlinearity that clips the noise tail (lowering
+  EVM) while pulling every symbol toward its decision boundary (raising BER).
+  Such rows are flagged `LIMITING` and excluded from the ranking. A negative
+  implementation loss is a signal that EVM has stopped being a valid proxy,
+  which is why the table now carries BER and fitted gain beside it.
+
+  The factorial puts **essentially the whole 8-bit loss in `StateScalar`** —
+  1.28 dB of 1.28 dB for `posit<8,2>` — against 0.05 dB for coefficients and
+  0.19 dB for the sample stream. That refutes the reading of
+  `analysis/sdr_precision`'s attribution, which had named the constellation
+  table the largest contributor; the two tools answer different questions,
+  and the docs now say which one a design decision needs.
+
+  The ranking is stable in Eb/N0: no pair swaps by more than 0.1 dB anywhere
+  across the range measured. What #104 got wrong was which members it
+  compared, not where it compared them.
+
+- `ChainResult` gains `gain` and `residual_evm`, fitted with
+  `sdr::iq_imbalance`, so a compressive datapath is visible as a gain below 1
+  rather than hiding inside an EVM number. The standard sweep's figures are
+  unchanged.
+
 - Documentation: SDR mixed-precision guide (#105, closes epic #85). Six new
   docs-site pages under `sdr/` — overview, constellation/pulse-shaping/metrics,
   synchronization, OFDM, channelizer, and precision analysis — plus a new
