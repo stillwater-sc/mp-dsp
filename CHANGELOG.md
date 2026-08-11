@@ -10,11 +10,42 @@ those are summarized from their release commits and are intentionally terse.
 
 ## [Unreleased]
 
-**Milestone v0.10 — Software Defined Radio — is complete.** Epic #85 and all
-eleven of its sub-issues (#95–#105) are closed, along with #208 and #209. The
-epic's stated premise did not survive its own capstone measurement: see the
-`applications/sdr_demo` and `--study` entries below, and the correction
-recorded on #85. Not yet released; `version.hpp` still reads 0.9.0.
+## [0.10.0] — 2026-08-11
+
+The Software Defined Radio release. Epic #85 and all eleven of its sub-issues
+(#95–#105) close here, along with #208 and #209 — a complete modulation and
+demodulation stack under `sw::dsp::sdr`: constellation mapping and demapping
+(BPSK through 256-QAM, Gray-coded, hard and soft decisions), RRC pulse shaping,
+EVM/MER/BER measurement, the AGC / timing / carrier synchronization loops, OFDM
+with pilot-based channel estimation, and an oversampled channelizer with
+perfect reconstruction. Plus the integration layer: per-block precision
+attribution, a 15-configuration sweep application, and six documentation pages.
+
+**The epic's stated premise did not survive its own capstone measurement.**
+#85 assumed posit reaches a higher modulation order than cfloat or fixpnt at
+equal bit width. It does not, and the correction is recorded on the epic, in
+`applications/sdr_demo`, and in the documentation rather than quietly dropped.
+Two findings replace it:
+
+- **In an amplitude-normalized modem the format's advantage is not precision at
+  full scale — a uniform grid wins there — but the range of input levels over
+  which the modem holds its EVM.** Under input backoff `fixpnt<8,5>` is gone by
+  −12 dB while `posit<8,2>` holds to −36 dB, and `posit<16,2>` holds to −48 dB
+  against 24 dB for `fixpnt<16,13>`.
+- **At 8 bits the choice of family member decides the answer, not the family.**
+  Within-family spread (fixpnt 3.35 dB, posit 1.10 dB, cfloat 0.80 dB) dwarfs
+  the 0.46 dB between-family gap the original conclusion rested on, and most of
+  what the losing formats lose is a systematic gain error a receiver's AGC
+  removes for free.
+
+A third result runs through the whole module: **datapath blocks and feedback
+loops fail in opposite ways.** Datapath separates the number systems across
+orders of magnitude, and `posit<32,2>` beats `float` by 14–22 dB at equal
+width. The synchronization loops do not separate them at all — a loop is
+precision-insensitive until it crosses a ULP threshold and stops moving
+entirely. The fix for a failing loop is changing what the state holds
+(relative position, wrapped phase, deviation from nominal), never widening the
+type.
 
 ### Added
 
@@ -749,6 +780,7 @@ commits for the change set.
   a `v*` tag is pushed, verifying the tag matches the CMake version first.
 
 [Unreleased]: https://github.com/stillwater-sc/mixed-precision-dsp/compare/v0.9.0...HEAD
+[0.10.0]: https://github.com/stillwater-sc/mixed-precision-dsp/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/stillwater-sc/mixed-precision-dsp/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/stillwater-sc/mixed-precision-dsp/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/stillwater-sc/mixed-precision-dsp/compare/v0.6.1...v0.7.0

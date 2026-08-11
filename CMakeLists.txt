@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 if(NOT DEFINED DSP_MAJOR)
 	set(DSP_MAJOR 0)
-	set(DSP_MINOR 9)
+	set(DSP_MINOR 10)
 	set(DSP_PATCH 0)
 endif()
 
