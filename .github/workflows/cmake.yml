@@ -40,6 +40,12 @@ jobs:
       - name: Checkout dsp
         uses: actions/checkout@v5
 
+      - name: Install CMake 4.x
+        if: runner.os == 'Linux'
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '4.x'
+
       - name: Install Clang
         if: matrix.compiler == 'clang'
         run: |
@@ -86,6 +92,11 @@ jobs:
     steps:
       - name: Checkout dsp
         uses: actions/checkout@v5
+
+      - name: Install CMake 4.x
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '4.x'
 
       - name: Install RISC-V GCC toolchain and QEMU
         run: |
