@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 4.0)
 
 if(NOT DEFINED DSP_MAJOR)
 	set(DSP_MAJOR 0)
@@ -82,7 +82,7 @@ else()
 	message(STATUS "Universal not found via find_package, fetching headers from GitHub")
 	dsp_fetch_headers_only(universal
 		https://github.com/stillwater-sc/universal.git
-		v4.6.10)
+		v5.1.0)
 	# Universal headers use two include conventions:
 	#   - External: #include <sw/universal/...>  (needs include/)
 	#   - Internal: #include <universal/...>     (needs include/sw/)
