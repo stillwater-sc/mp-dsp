@@ -161,7 +161,7 @@ analyzer; in an FFT analyzer the equivalent is the bin width
 - **Noise floor (per bin)** — narrowing the RBW reduces the noise
   power per bin proportionally (`-3 dB` per RBW halving).
 
-The library's [`RBWFilter`](https://github.com/stillwater-sc/mixed-precision-dsp/blob/main/include/sw/dsp/spectrum/rbw_filter.hpp)
+The library's [`RBWFilter`](https://github.com/stillwater-sc/mp-dsp/blob/main/include/sw/dsp/spectrum/rbw_filter.hpp)
 implements a synchronously-tuned cascade of N RBJ band-pass biquads.
 The cascade-N choice sets the *shape factor* — the 60 dB / 3 dB
 bandwidth ratio:
@@ -178,7 +178,7 @@ bandwidth ratio:
 The VBW is a post-detector low-pass filter that smooths the trace.
 Lower VBW = more averaging = lower-noise trace at the cost of slower
 response to changes. The library's
-[`VBWFilter`](https://github.com/stillwater-sc/mixed-precision-dsp/blob/main/include/sw/dsp/spectrum/vbw_filter.hpp)
+[`VBWFilter`](https://github.com/stillwater-sc/mp-dsp/blob/main/include/sw/dsp/spectrum/vbw_filter.hpp)
 is a matched-z single-pole IIR (`alpha = 1 - exp(-2π fc / fs)`) — the
 simplest filter that does the job, bumpless on retune.
 

@@ -5,7 +5,7 @@ import rehypeKatex from 'rehype-katex';
 
 export default defineConfig({
   site: 'https://stillwater-sc.github.io',
-  base: '/mixed-precision-dsp',
+  base: '/mp-dsp',
   markdown: {
     remarkPlugins: [remarkMath],
     rehypePlugins: [rehypeKatex],
@@ -18,10 +18,10 @@ export default defineConfig({
         'katex/dist/katex.min.css',
       ],
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/stillwater-sc/mixed-precision-dsp' },
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/stillwater-sc/mp-dsp' },
       ],
       editLink: {
-        baseUrl: 'https://github.com/stillwater-sc/mixed-precision-dsp/edit/main/docs-site/',
+        baseUrl: 'https://github.com/stillwater-sc/mp-dsp/edit/main/docs-site/',
       },
       sidebar: [
         {

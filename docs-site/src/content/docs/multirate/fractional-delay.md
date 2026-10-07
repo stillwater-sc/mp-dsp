@@ -9,7 +9,7 @@ bank that shifts an input stream by any multiple of 1/L samples at
 runtime, without redesigning any coefficients between calls.
 
 This class complements the existing static
-[`sw::dsp::instrument::FractionalDelay`](https://github.com/stillwater-sc/mixed-precision-dsp/blob/main/include/sw/dsp/instrument/fractional_delay.hpp),
+[`sw::dsp::instrument::FractionalDelay`](https://github.com/stillwater-sc/mp-dsp/blob/main/include/sw/dsp/instrument/fractional_delay.hpp),
 which redesigns its FIR whenever `set_delay()` is called. The polyphase
 variant trades memory (L filter phases held in RAM) for the ability to
 switch phases per-sample.
@@ -182,7 +182,7 @@ impulse response reproduces its input to $3\times10^{-17}$.
 With even $K$ the floor lands on a half-integer, so **no** request maps
 to an unfiltered tap and every output — including a nominally integer
 delay — pays interpolation error and passband droop. That is why the
-constraint exists, and why [#208](https://github.com/stillwater-sc/mixed-precision-dsp/issues/208)
+constraint exists, and why [#208](https://github.com/stillwater-sc/mp-dsp/issues/208)
 was fixed by moving the default onto an odd value (11) rather than by
 relaxing the check.
 
@@ -197,5 +197,5 @@ relaxing the check.
 
 - [Multirate Overview](./overview/) — polyphase decomposition theory
 - [Pattern Catalog](./patterns/) — full multirate problem→API mapping
-- [`instrument::FractionalDelay`](https://github.com/stillwater-sc/mixed-precision-dsp/blob/main/include/sw/dsp/instrument/fractional_delay.hpp) — the static, design-at-construction variant. It has no docs-site page yet, so this points at the header.
+- [`instrument::FractionalDelay`](https://github.com/stillwater-sc/mp-dsp/blob/main/include/sw/dsp/instrument/fractional_delay.hpp) — the static, design-at-construction variant. It has no docs-site page yet, so this points at the header.
 - [Audio Resampler Demo](./audio-resampler/) — sibling multirate demonstrator using polyphase for rational rate conversion

@@ -1,6 +1,6 @@
 # KFR vs. mixed-precision-dsp
 
-A capability comparison between [KFR](https://github.com/kfrlib/kfr) (v7) and [stillwater-sc/mixed-precision-dsp](https://github.com/stillwater-sc/mixed-precision-dsp).
+A capability comparison between [KFR](https://github.com/kfrlib/kfr) (v7) and [stillwater-sc/mp-dsp](https://github.com/stillwater-sc/mp-dsp).
 
 Two very different philosophies. KFR is a **performance-first SIMD DSP framework for production audio/signal work**. mixed-precision-dsp is a **research-grade numerical analysis toolkit for studying how arithmetic precision affects DSP algorithms**.
 

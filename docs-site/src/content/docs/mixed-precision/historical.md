@@ -134,5 +134,5 @@ floating-point representations.
   1969 -- the foundational text on coefficient quantization analysis.
 - A.V. Oppenheim and R.W. Schafer, *Discrete-Time Signal Processing*,
   Prentice Hall -- chapters on finite word-length effects.
-- See also: [Historical Fixed-Point FFT](/mixed-precision-dsp/mixed-precision/historical-fft/)
+- See also: [Historical Fixed-Point FFT](/mp-dsp/mixed-precision/historical-fft/)
   for FFT-specific scaling strategies.

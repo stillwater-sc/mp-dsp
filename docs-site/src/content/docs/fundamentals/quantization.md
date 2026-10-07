@@ -267,5 +267,5 @@ silicon area without sacrificing signal integrity.
 ## Next steps
 
 With an understanding of signals, sampling, and quantization, you are
-ready to explore [filter design](/mixed-precision-dsp/filter/overview/) -- where the
+ready to explore [filter design](/mp-dsp/filter/overview/) -- where the
 three-scalar model meets classical IIR and FIR techniques.

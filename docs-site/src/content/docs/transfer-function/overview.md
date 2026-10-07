@@ -3,9 +3,9 @@ title: Transfer Function Monitor Overview
 description: Numerical Bode sweeps for any LTI block plus analytical closed-form pole/zero extraction from filter prototypes, with dump-to-JSON/CSV for external visualization
 ---
 
-The `transfer_function/` module (Epic [#160](https://github.com/stillwater-sc/mixed-precision-dsp/issues/160),
-sub-issues [#157](https://github.com/stillwater-sc/mixed-precision-dsp/issues/157)
-+ [#158](https://github.com/stillwater-sc/mixed-precision-dsp/issues/158))
+The `transfer_function/` module (Epic [#160](https://github.com/stillwater-sc/mp-dsp/issues/160),
+sub-issues [#157](https://github.com/stillwater-sc/mp-dsp/issues/157)
++ [#158](https://github.com/stillwater-sc/mp-dsp/issues/158))
 adds two complementary tools for inspecting LTI block behavior:
 
 | Tool | Header | Works on | Output |

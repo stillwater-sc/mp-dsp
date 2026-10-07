@@ -16,7 +16,7 @@ stops closing.**
 
 Two tools cover it, and the difference between them is important:
 
-| | `analysis/sdr_precision.hpp` | [`applications/sdr_demo`](https://github.com/stillwater-sc/mixed-precision-dsp/tree/main/applications/sdr_demo) |
+| | `analysis/sdr_precision.hpp` | [`applications/sdr_demo`](https://github.com/stillwater-sc/mp-dsp/tree/main/applications/sdr_demo) |
 |---|---|---|
 | What runs narrow | Coefficients are **projected** into the narrow type; the arithmetic runs in `double` | `PolyphaseInterpolator<Coeff,State,Sample>` and `FIRFilter<Coeff,State,Sample>` are **instantiated** on the type: coefficients, accumulators and samples all run narrow |
 | Measures | Storage precision | Arithmetic precision |
@@ -332,7 +332,7 @@ The 8-bit ordering above was measured but not mechanistically explained,
 and two things about it were suspicious: `posit<8,2>` and `cfloat<8,4>`
 agreed to three digits, and `fixpnt<8,5>` had a hand-picked binary point
 that the other two families have no equivalent of.
-[Issue #209](https://github.com/stillwater-sc/mixed-precision-dsp/issues/209)
+[Issue #209](https://github.com/stillwater-sc/mp-dsp/issues/209)
 swept the whole 8-bit design space, ran a three-scalar factorial, and
 took loss-versus-$E_b/N_0$ curves. **The ordering did not survive.**
 

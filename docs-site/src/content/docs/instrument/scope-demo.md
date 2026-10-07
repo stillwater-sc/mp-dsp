@@ -4,7 +4,7 @@ description: Capstone walkthrough wiring the calibration equalizer, trigger, rin
 ---
 
 The library ships a runnable digital-oscilloscope demo at
-[`applications/scope_demo/`](https://github.com/stillwater-sc/mixed-precision-dsp/tree/main/applications/scope_demo)
+[`applications/scope_demo/`](https://github.com/stillwater-sc/mp-dsp/tree/main/applications/scope_demo)
 that exercises the entire `instrument/` module end-to-end and **sweeps
 precision per stage**, not uniformly across the whole pipeline. A
 simulated ADC produces a 50 MHz square wave with a 5 ns glitch buried
@@ -364,7 +364,7 @@ hundreds of parallel taps; this CPU implementation is for
 Real digital scopes are 2-channel or 4-channel — cross-channel comparison
 is one of their primary uses. The `applications/scope_demo_2ch/`
 executable
-([#173](https://github.com/stillwater-sc/mixed-precision-dsp/issues/173))
+([#173](https://github.com/stillwater-sc/mp-dsp/issues/173))
 extends the pipeline shape above to two channels, exercising two
 `instrument/` primitives the single-channel demo doesn't touch:
 
@@ -489,9 +489,9 @@ treat the file as a superset of the single-channel schema.
 
 ## Out of scope (deferred)
 
-The original v0.6 capstone ([#152](https://github.com/stillwater-sc/mixed-precision-dsp/issues/152))
+The original v0.6 capstone ([#152](https://github.com/stillwater-sc/mp-dsp/issues/152))
 explicitly deferred several items; the v0.7 follow-up
-([#172](https://github.com/stillwater-sc/mixed-precision-dsp/issues/172))
+([#172](https://github.com/stillwater-sc/mp-dsp/issues/172))
 landed the pre-distortion stage. What's still deferred:
 
 - **Real ADC interfacing** (e.g. TI ADC12DJ5200RF). Simulated only.

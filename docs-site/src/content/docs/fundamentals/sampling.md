@@ -111,7 +111,7 @@ $$
 \text{SNR gain} \approx 10 \log_{10}(M) \text{ dB}
 $$
 
-With first-order noise shaping (see [Quantization](/mixed-precision-dsp/fundamentals/quantization/)),
+With first-order noise shaping (see [Quantization](/mp-dsp/fundamentals/quantization/)),
 the gain increases to approximately $30\log_{10}(M)$ dB per octave of
 oversampling -- the principle behind sigma-delta ADCs.
 
@@ -179,6 +179,6 @@ precision to the sensitivity of each arithmetic path.
 ## Next steps
 
 Sampling converts a continuous signal to a discrete sequence;
-[Quantization](/mixed-precision-dsp/fundamentals/quantization/) converts continuous
+[Quantization](/mp-dsp/fundamentals/quantization/) converts continuous
 amplitudes to discrete levels -- the second essential step in any
 digital system.

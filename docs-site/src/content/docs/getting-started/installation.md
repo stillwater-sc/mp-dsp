@@ -14,14 +14,14 @@ them separately.
 | Requirement | Minimum version |
 |-------------|----------------|
 | C++ standard | C++20 |
-| CMake | 3.22 |
+| CMake | 4.0 |
 | Compiler | GCC 11+, Clang 14+, MSVC 2022+ |
 
 ## Clone and build
 
 ```bash
-git clone https://github.com/stillwater-sc/mixed-precision-dsp.git
-cd mixed-precision-dsp
+git clone https://github.com/stillwater-sc/mp-dsp.git
+cd mp-dsp
 
 cmake -B build -Wno-dev
 cmake --build build -j4
@@ -66,7 +66,7 @@ Add the following to your project's `CMakeLists.txt`:
 ```cmake
 include(FetchContent)
 FetchContent_Declare(dsp
-    GIT_REPOSITORY https://github.com/stillwater-sc/mixed-precision-dsp.git
+    GIT_REPOSITORY https://github.com/stillwater-sc/mp-dsp.git
     GIT_TAG        main
     GIT_SHALLOW    TRUE
 )
@@ -92,7 +92,7 @@ target_link_libraries(your_target PRIVATE sw::dsp)
 Clone or add the repository as a Git submodule, then:
 
 ```cmake
-add_subdirectory(external/mixed-precision-dsp)
+add_subdirectory(external/mp-dsp)
 target_link_libraries(your_target PRIVATE sw::dsp)
 ```
 

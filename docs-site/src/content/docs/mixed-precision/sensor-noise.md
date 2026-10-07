@@ -186,7 +186,7 @@ cmake --build build --target mixed_precision_image
 
 The full assessment, including detailed analysis and methodology, is
 available in the repository at
-[docs/assessments/sensor-noise-arithmetic-precision.md](https://github.com/stillwater-sc/mixed-precision-dsp/blob/main/docs/assessments/sensor-noise-arithmetic-precision.md).
+[docs/assessments/sensor-noise-arithmetic-precision.md](https://github.com/stillwater-sc/mp-dsp/blob/main/docs/assessments/sensor-noise-arithmetic-precision.md).
 
 ## The bottom line
 

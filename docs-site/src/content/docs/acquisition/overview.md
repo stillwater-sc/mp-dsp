@@ -110,7 +110,7 @@ The phase-accumulator NCO produces $\cos(2\pi f_0 n / f_s) + j\sin(\ldots)$
 at any frequency exactly representable as a phase increment. Use it
 alone for signal generation, or as the local oscillator for a DDC.
 At a bin-aligned tone the regression test
-[`tests/test_acquisition_precision.cpp`](https://github.com/stillwater-sc/mixed-precision-dsp/blob/main/tests/test_acquisition_precision.cpp)
+[`tests/test_acquisition_precision.cpp`](https://github.com/stillwater-sc/mp-dsp/blob/main/tests/test_acquisition_precision.cpp)
 measures **175 dB SFDR** for `posit<32, 2>` and ~319 dB for `double`
 (the latter is FFT-leakage-limited rather than precision-limited).
 Off-bin tones and shorter FFTs reduce these figures, so the test's
@@ -186,14 +186,14 @@ pipeline at non-IEEE precision.
 For empirical SNR/ENOB measurements across the chain, use the
 [acquisition precision analysis](../../analysis/acquisition-precision/)
 primitives. They reuse identifier columns from the
-[`precision_sweep`](https://github.com/stillwater-sc/mixed-precision-dsp/tree/main/applications/precision_sweep)
+[`precision_sweep`](https://github.com/stillwater-sc/mp-dsp/tree/main/applications/precision_sweep)
 CSV schema, so the same Python tools that visualize IIR sweeps work
 on receiver-chain sweeps.
 
 ## Worked-example reference numbers
 
 The end-to-end demo
-([`applications/acquisition_demo/acquisition_demo.cpp`](https://github.com/stillwater-sc/mixed-precision-dsp/blob/main/applications/acquisition_demo/acquisition_demo.cpp))
+([`applications/acquisition_demo/acquisition_demo.cpp`](https://github.com/stillwater-sc/mp-dsp/blob/main/applications/acquisition_demo/acquisition_demo.cpp))
 measures these SNR floors for a 16-bit ADC at 1 MHz feeding the full
 DDC + CIC↓2 → half-band ↓2 → polyphase ↓2 chain (total ↓16). The
 numbers below were captured against current `main`; reproduce by
@@ -218,7 +218,7 @@ structurally requires. The [end-to-end demo](./demo/) walks through
 this measurement and the CIC reference covers the underlying math.
 
 A separate, narrower regression test in
-[`tests/test_acquisition_precision.cpp`](https://github.com/stillwater-sc/mixed-precision-dsp/blob/main/tests/test_acquisition_precision.cpp)
+[`tests/test_acquisition_precision.cpp`](https://github.com/stillwater-sc/mp-dsp/blob/main/tests/test_acquisition_precision.cpp)
 measures `posit<32,2>` at ~98 dB on a 3-stage CIC → half-band →
 polyphase chain with no DC bias in the input — illustrating that the
 54 dB demo number is specific to the IF-receiver workload, not a

@@ -4,7 +4,7 @@ description: Free-function views that turn a captured probe stream into structur
 ---
 
 `sw::dsp::probe::` provides four **domain views** (sub-issue
-[#156](https://github.com/stillwater-sc/mixed-precision-dsp/issues/156))
+[#156](https://github.com/stillwater-sc/mp-dsp/issues/156))
 that take a [SignalProbe](./overview/) and produce the right kind of
 structured data for a given analysis question. Each view exposes a
 `dump_csv(path)` matching the schema families the mp-dsp-python

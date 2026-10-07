@@ -169,7 +169,7 @@ correspondence to converter word lengths.
 
 These configurations are grounded in historical DSP practice and
 represent meaningful evaluation points for the
-[precision sweep](/mixed-precision-dsp/mixed-precision/motivation/) tool:
+[precision sweep](/mp-dsp/mixed-precision/motivation/) tool:
 
 | Configuration | CoeffScalar | StateScalar | SampleScalar |
 |--------------|-------------|-------------|--------------|

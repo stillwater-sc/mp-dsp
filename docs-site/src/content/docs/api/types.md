@@ -5,7 +5,7 @@ description: Key data types in the mixed-precision DSP library -- signals, biqua
 
 All types live in the `sw::dsp` namespace and are parameterized on scalar
 types constrained by the library's C++20 concepts (see
-[Concepts](/mixed-precision-dsp/api/concepts/)).
+[Concepts](/mp-dsp/api/concepts/)).
 
 ## Signal containers
 

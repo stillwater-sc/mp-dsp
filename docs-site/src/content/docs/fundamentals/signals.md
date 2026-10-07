@@ -192,5 +192,5 @@ in a `Signal<T>` when sample-rate metadata is needed.
 ## Next steps
 
 With a firm grasp of discrete-time signals, the next fundamental topic is
-[Sampling and Aliasing](/mixed-precision-dsp/fundamentals/sampling/) -- how the choice of
+[Sampling and Aliasing](/mp-dsp/fundamentals/sampling/) -- how the choice of
 $f_s$ determines what information is preserved and what is lost.
