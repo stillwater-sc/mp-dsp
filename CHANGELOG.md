@@ -10,6 +10,24 @@ those are summarized from their release commits and are intentionally terse.
 
 ## [Unreleased]
 
+### Changed
+
+- **Build now requires CMake 4.0** (`cmake_minimum_required` raised from
+  3.22). This applies to consumers as well as CI: stock Ubuntu 24.04 ships
+  CMake 3.28 and cannot configure the project. `README.md` and
+  `docs/design.md` still say "CMake 3.22+".
+- The headers-only Universal fallback fetch moved from `v4.6.10` to `v5.1.0`
+  (used only when `find_package(universal)` fails). All five CI platforms
+  build and pass against it.
+
+### Fixed
+
+- CI: the Linux GCC, Linux Clang and RISC-V cross-compile jobs failed at
+  configure after the CMake 4.0 bump, because `ubuntu-latest` provides CMake
+  3.31.6. Those jobs now install CMake 4.x through
+  `jwlawson/actions-setup-cmake@v2` (#210). The Windows and macOS runners
+  already had CMake 4 and were unaffected.
+
 ## [0.10.0] — 2026-08-11
 
 The Software Defined Radio release. Epic #85 and all eleven of its sub-issues
