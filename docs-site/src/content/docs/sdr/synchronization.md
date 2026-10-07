@@ -410,7 +410,7 @@ Note the matched filter's scalars: with a complex `SampleScalar` the
 `StateScalar` must be complex too, since the delay line holds samples.
 `CoeffScalar` stays real — the RRC taps are real. The alternative
 idiom, used in
-[`tests/test_sdr_rrc.cpp`](https://github.com/stillwater-sc/mixed-precision-dsp/blob/main/tests/test_sdr_rrc.cpp),
+[`tests/test_sdr_rrc.cpp`](https://github.com/stillwater-sc/mp-dsp/blob/main/tests/test_sdr_rrc.cpp),
 is two real filters run on I and Q separately, which is what a hardware
 implementation does.
 

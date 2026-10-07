@@ -4,7 +4,7 @@ description: Capstone walkthrough composing NCO, mixer, polyphase decimation, an
 ---
 
 The library ships a runnable demo at
-[`applications/acquisition_demo/`](https://github.com/stillwater-sc/mixed-precision-dsp/tree/main/applications/acquisition_demo)
+[`applications/acquisition_demo/`](https://github.com/stillwater-sc/mp-dsp/tree/main/applications/acquisition_demo)
 that ties the entire data-acquisition stack together: a simulated ADC,
 a DDC composing NCO + complex mixer + polyphase decimation, two
 parallel `DecimationChain` instances handling the I and Q baseband
@@ -115,7 +115,7 @@ polyphase) are computed in `double` and then projected to
 `CoeffScalar` via `static_cast`. This deliberately deviates from the
 T-parameterized design pattern the rest of the library follows
 (see the
-[T-parameterization audit](https://github.com/stillwater-sc/mixed-precision-dsp/issues/111))
+[T-parameterization audit](https://github.com/stillwater-sc/mp-dsp/issues/111))
 because we want the SNR measurement to isolate **streaming
 arithmetic** precision from **filter-design** precision. If we
 designed taps at `CoeffScalar`, the test and the `double` reference

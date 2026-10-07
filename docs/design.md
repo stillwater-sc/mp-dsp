@@ -264,7 +264,7 @@ This is explicit opt-in, not the default.
 
 ## Build System
 
-CMake 3.22+, header-only INTERFACE library. Supports:
+CMake 4.0+, header-only INTERFACE library. Supports:
 - **Linux**: GCC 12+, Clang 15+
 - **macOS**: AppleClang 15+, GCC 12+
 - **Windows**: MSVC 2022+ (17.4+)

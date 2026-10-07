@@ -4,7 +4,7 @@ description: Capstone walkthrough wiring the front-end corrector, swept LO, RBW 
 ---
 
 The library ships a runnable spectrum-analyzer demo at
-[`applications/spectrum_analyzer_demo/`](https://github.com/stillwater-sc/mixed-precision-dsp/tree/main/applications/spectrum_analyzer_demo)
+[`applications/spectrum_analyzer_demo/`](https://github.com/stillwater-sc/mp-dsp/tree/main/applications/spectrum_analyzer_demo)
 that exercises the entire `spectrum/` module end-to-end and **runs
 both analyzer architectures in parallel** at four precision plans.
 A synthetic three-tone signal (50 / 100 / 150 kHz at 0 / -30 / -60 dBc)

@@ -14,8 +14,13 @@ those are summarized from their release commits and are intentionally terse.
 
 - **Build now requires CMake 4.0** (`cmake_minimum_required` raised from
   3.22). This applies to consumers as well as CI: stock Ubuntu 24.04 ships
-  CMake 3.28 and cannot configure the project. `README.md` and
-  `docs/design.md` still say "CMake 3.22+".
+  CMake 3.28 and cannot configure the project. `README.md`,
+  `docs/design.md` and the installation page now say so.
+- **Repository renamed `mixed-precision-dsp` → `mp-dsp`.** The docs site's
+  `base` path is now `/mp-dsp`, matching the new GitHub Pages URL. GitHub
+  links, the CI badge, the clone instructions and the `FetchContent`
+  `GIT_REPOSITORY` example were updated to match. The library's name in
+  prose is unchanged.
 - The headers-only Universal fallback fetch moved from `v4.6.10` to `v5.1.0`
   (used only when `find_package(universal)` fails). All five CI platforms
   build and pass against it.

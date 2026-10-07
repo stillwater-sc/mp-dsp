@@ -134,7 +134,7 @@ double cic_contribution_db = snr_db(out_ref, out_with_cic_at_posit);
 
 `AcquisitionPrecisionRow` and `write_acquisition_csv` produce CSV
 output that intentionally reuses identifier columns from the
-[`precision_sweep.csv`](https://github.com/stillwater-sc/mixed-precision-dsp/tree/main/applications/precision_sweep)
+[`precision_sweep.csv`](https://github.com/stillwater-sc/mp-dsp/tree/main/applications/precision_sweep)
 schema (used by the library's Python visualization tooling), then
 diverges into acquisition-specific metrics. The schemas are siblings,
 not super/subsets — IIR precision sweeps and acquisition pipelines

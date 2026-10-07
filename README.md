@@ -1,6 +1,6 @@
 # Mixed-Precision Digital Signal Processing
 
-[![CMake](https://github.com/stillwater-sc/mixed-precision-dsp/actions/workflows/cmake.yml/badge.svg)](https://github.com/stillwater-sc/mixed-precision-dsp/actions/workflows/cmake.yml)
+[![CMake](https://github.com/stillwater-sc/mp-dsp/actions/workflows/cmake.yml/badge.svg)](https://github.com/stillwater-sc/mp-dsp/actions/workflows/cmake.yml)
 
 A modern C++20 header-only library for Digital Signal Processing with
 arithmetic type parameterization as a first-class design feature.
@@ -176,14 +176,14 @@ automatically via CMake `FetchContent` if not found on the system.
 
 ### Prerequisites
 
-- CMake 3.22+
+- CMake 4.0+
 - C++20 compiler: GCC 12+, Clang 15+, MSVC 2022 (17.4+), or Apple Clang 15+
 
 ### Native Build
 
 ```bash
-git clone https://github.com/stillwater-sc/mixed-precision-dsp.git
-cd mixed-precision-dsp
+git clone https://github.com/stillwater-sc/mp-dsp.git
+cd mp-dsp
 
 # CMake will fetch Universal and MTL5 automatically via FetchContent
 cmake -B build

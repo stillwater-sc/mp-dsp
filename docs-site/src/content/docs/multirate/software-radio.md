@@ -50,7 +50,7 @@ This demo previously used `PolyphaseDecimator` with
 `design_fir_lowpass<double>` + Kaiser $\beta = 10$ instead, because
 `design_halfband()` returned filters whose stopband depth capped near
 -25 dB regardless of tap count and collapsed entirely past 63 taps.
-That was [issue #203](https://github.com/stillwater-sc/mixed-precision-dsp/issues/203)
+That was [issue #203](https://github.com/stillwater-sc/mp-dsp/issues/203)
 — the Remez exchange was not producing equiripple designs — and it is
 fixed.
 

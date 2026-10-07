@@ -97,7 +97,7 @@ Every historical FFT technique maps to `sw::dsp`'s parameterization:
 
 ## Configurations for the precision sweep
 
-The [FFT trade-off analysis](/mixed-precision-dsp/mixed-precision/motivation/)
+The [FFT trade-off analysis](/mp-dsp/mixed-precision/motivation/)
 tool evaluates these historically-grounded configurations:
 
 | Configuration | Twiddle | Accumulator | Data |

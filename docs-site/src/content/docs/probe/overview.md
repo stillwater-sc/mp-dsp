@@ -3,8 +3,8 @@ title: Pipeline Probes Overview
 description: Attach probes to any point in a pipeline to inspect samples flowing through — captured to CSV/JSON for external analysis and visualization
 ---
 
-The `probe/` module (Epic [#160](https://github.com/stillwater-sc/mixed-precision-dsp/issues/160),
-sub-issue [#155](https://github.com/stillwater-sc/mixed-precision-dsp/issues/155))
+The `probe/` module (Epic [#160](https://github.com/stillwater-sc/mp-dsp/issues/160),
+sub-issue [#155](https://github.com/stillwater-sc/mp-dsp/issues/155))
 adds pipeline sample-tap primitives so users can inspect intermediate
 signal points in the pipelines they assemble from the library.
 
