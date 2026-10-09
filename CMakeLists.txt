@@ -82,7 +82,7 @@ else()
 	message(STATUS "Universal not found via find_package, fetching headers from GitHub")
 	dsp_fetch_headers_only(universal
 		https://github.com/stillwater-sc/universal.git
-		v5.1.0)
+		v5.2.0)
 	# Universal headers use two include conventions:
 	#   - External: #include <sw/universal/...>  (needs include/)
 	#   - Internal: #include <universal/...>     (needs include/sw/)
@@ -106,7 +106,7 @@ else()
 	# which landed post-v5.2.0.
 	dsp_fetch_headers_only(mtl5
 		https://github.com/stillwater-sc/mtl5.git
-		v5.5.0)
+		v5.12.0)
 	# SYSTEM: see Universal block above for rationale.
 	target_include_directories(${PROJECT_NAME} SYSTEM INTERFACE
 		$<BUILD_INTERFACE:${mtl5_SOURCE_DIR}/include>)

@@ -21,9 +21,9 @@ those are summarized from their release commits and are intentionally terse.
   links, the CI badge, the clone instructions and the `FetchContent`
   `GIT_REPOSITORY` example were updated to match. The library's name in
   prose is unchanged.
-- The headers-only Universal fallback fetch moved from `v4.6.10` to `v5.1.0`
-  (used only when `find_package(universal)` fails). All five CI platforms
-  build and pass against it.
+- The headers-only fallback fetches moved to the latest releases: Universal
+  `v4.6.10` → `v5.2.0` and MTL5 `v5.5.0` → `v5.12.0` (used only when
+  `find_package(universal)` / `find_package(MTL5)` fails).
 
 ### Fixed
 
