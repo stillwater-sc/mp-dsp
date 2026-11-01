@@ -25,10 +25,13 @@ those are summarized from their release commits and are intentionally terse.
   `v4.6.10` → `v5.2.0` and MTL5 `v5.5.0` → `v5.12.0` (used only when
   `find_package(universal)` / `find_package(MTL5)` fails).
 - The MTL5 headers-only fallback moves from `v5.12.0` to `v5.22.0`. mp-dsp
-  uses MTL5's dense containers, `inv`, `trans` and `ldlt`. None of the
-  changes from 5.12 to 5.22 that alter results (the dlarfg-signed
-  `householder()`, the scaled Givens rotation, the `ldlt` default path's
-  last-bit change) reaches a test: the suite passes unchanged.
+  uses MTL5's dense containers, `inv`, `trans` and `ldlt`. Of the changes
+  from 5.12 to 5.22 that alter results, `ldlt_factor`'s default path rounds
+  differently in the last bits (MTL5 #421), and the UKF reaches it through
+  `generate_sigma_points` (`include/sw/dsp/estimation/ukf.hpp`), which
+  `tests/test_kalman.cpp` exercises. The suite passes unchanged against
+  5.22.0. The dlarfg-signed `householder()` and the scaled Givens rotation
+  are not on any mp-dsp path.
 
 ### Fixed
 
