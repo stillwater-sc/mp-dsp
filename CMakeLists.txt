@@ -106,7 +106,7 @@ else()
 	# which landed post-v5.2.0.
 	dsp_fetch_headers_only(mtl5
 		https://github.com/stillwater-sc/mtl5.git
-		v5.12.0)
+		v5.22.0)
 	# SYSTEM: see Universal block above for rationale.
 	target_include_directories(${PROJECT_NAME} SYSTEM INTERFACE
 		$<BUILD_INTERFACE:${mtl5_SOURCE_DIR}/include>)

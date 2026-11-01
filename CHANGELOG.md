@@ -24,6 +24,11 @@ those are summarized from their release commits and are intentionally terse.
 - The headers-only fallback fetches moved to the latest releases: Universal
   `v4.6.10` → `v5.2.0` and MTL5 `v5.5.0` → `v5.12.0` (used only when
   `find_package(universal)` / `find_package(MTL5)` fails).
+- The MTL5 headers-only fallback moves from `v5.12.0` to `v5.22.0`. mp-dsp
+  uses MTL5's dense containers, `inv`, `trans` and `ldlt`. None of the
+  changes from 5.12 to 5.22 that alter results (the dlarfg-signed
+  `householder()`, the scaled Givens rotation, the `ldlt` default path's
+  last-bit change) reaches a test: the suite passes unchanged.
 
 ### Fixed
 
