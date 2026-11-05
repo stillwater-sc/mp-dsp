@@ -40,6 +40,39 @@ those are summarized from their release commits and are intentionally terse.
   3.31.6. Those jobs now install CMake 4.x through
   `jwlawson/actions-setup-cmake@v2` (#210). The Windows and macOS runners
   already had CMake 4 and were unaffected.
+- **`filter/iir/rbj.hpp` builds with `-fno-exceptions`** (#217). It threw
+  `std::invalid_argument` from a non-template function, so any translation
+  unit that included it failed to compile without exceptions. Built that way,
+  `setup()` now calls `std::abort()` where it would have thrown, and builds no
+  `std::string`. With exceptions enabled it throws the same messages as
+  before.
+
+### Added
+
+- **Allocation-free RBJ coefficient functions for real-time loops** (#217):
+  - `rbj::lowpass_coefficients(w0, q)`, and the same for `highpass`,
+    `bandpass`, `bandstop` and `allpass` (the last four's second argument is
+    the bandwidth for `bandpass` and `bandstop`), plus
+    `lowshelf_coefficients(w0, gain_db, slope)` and `highshelf_coefficients`.
+    Each returns a `BiquadCoefficients<T>`, is `noexcept`, and never
+    allocates, so a notch that tracks a motor's RPM can be redesigned every
+    control tick. `w0` is 2πf/fs in radians per sample.
+  - **Preconditions:** 0 < w0 < π, plus q > 0 and finite, or for the shelves
+    a finite gain and slope > 0. They are checked with `assert`, and
+    `rbj_parameters_valid` / `rbj_shelf_parameters_valid` check them without
+    asserting or throwing.
+  - **Bit-identical to `setup()`:** `angular_frequency<T>(fs, f)` computes w0
+    exactly as `setup()` does, and `setup()` now runs the same formulas, so a
+    free function given that w0 returns the coefficients `setup()` stores.
+    That is checked over a grid of designs in double, float and posit<32,2>
+    (`test_rbj_coefficients`). `setup()`'s own results are unchanged, bit for
+    bit, against the previous implementation.
+  - **CI:** `test_no_exceptions` compiles the biquad design path
+    (`types/biquad_coefficients.hpp`, `filter/biquad/*`,
+    `filter/iir/{rbj,butterworth}.hpp` and `analysis/stability.hpp`) with
+    `-fno-exceptions -Werror` on GCC and Clang and runs a per-tick notch
+    redesign. Universal's posit does not yet build without exceptions, so that
+    test uses double and float only.
 
 ## [0.10.0] — 2026-08-11
 

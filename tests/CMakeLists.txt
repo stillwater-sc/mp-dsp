@@ -86,6 +86,13 @@ dsp_add_test(test_butterworth     "Tests/Filter/IIR")
 dsp_add_test(test_chebyshev       "Tests/Filter/IIR")
 dsp_add_test(test_bessel          "Tests/Filter/IIR")
 dsp_add_test(test_elliptic        "Tests/Filter/IIR")
+dsp_add_test(test_rbj_coefficients "Tests/Filter/IIR")
+# The biquad design path must build without exceptions, for firmware (#217).
+# GCC and Clang only: MSVC spells the flag /EHs-c-.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+	dsp_add_test(test_no_exceptions "Tests/Filter/IIR")
+	target_compile_options(test_no_exceptions PRIVATE -fno-exceptions -Werror)
+endif()
 # FIR
 dsp_add_test(test_fir             "Tests/Filter/FIR")
 dsp_add_test(test_fir_multirate   "Tests/Filter/FIR")
