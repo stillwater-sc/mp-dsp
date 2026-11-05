@@ -144,6 +144,17 @@ void test_parameters_valid() {
 	P nar; nar.setnar();
 	require(!rbj::rbj_parameters_valid(P(0.1), nar), "posit q NaR");
 	require(!rbj::rbj_parameters_valid(nar, P(0.7)), "posit w0 NaR");
+	// Near Nyquist, w0 rounded to float or posit reaches T(pi) although the
+	// frequency is below fs/2; the free functions' domain excludes it, since
+	// every shape is unstable there, and setup() still accepts the frequency.
+	const double f_near = std::nextafter(24000.0, 0.0);
+	require(!rbj::rbj_parameters_valid(rbj::angular_frequency<float>(48000.0, f_near), 0.7071f),
+	        "float w0 rounded to pi is invalid");
+	require(!rbj::rbj_parameters_valid(rbj::angular_frequency<P>(48000.0, f_near), P(0.7071)),
+	        "posit w0 rounded past pi is invalid");
+	rbj::LowPass<float> near_nyquist;
+	near_nyquist.setup(48000.0, f_near, 0.7071);
+	++checks;
 	std::cout << "  rbj_parameters_valid: passed\n";
 }
 

@@ -48,6 +48,13 @@
 namespace sw::dsp::iir::rbj {
 
 /// w0 = 2*pi*freq/sample_rate, computed in T exactly as setup() computes it.
+///
+/// Close to Nyquist in a low-precision T, w0 can round to T(pi) or above even
+/// though freq < sample_rate/2: float at 48 kHz with freq just under 24 kHz
+/// gives w0 == T(pi), and posit<32,2> gives w0 > T(pi). Every RBJ shape is
+/// unstable there, so the free functions reject that w0: check
+/// rbj_parameters_valid before calling them on a frequency that can approach
+/// Nyquist, rather than relying on the assert.
 template <DspField T>
 T angular_frequency(double sample_rate, double freq) noexcept {
 	return T(two_pi) * T(freq) / T(sample_rate);
@@ -100,6 +107,8 @@ inline void validate_shelf(double gain_db, double slope, const char* name) {
 // The cookbook formulas, unchecked. setup() calls these after validating its
 // double arguments: near Nyquist, w0 rounded to a low-precision T can reach
 // T(pi) although freq < sample_rate/2, and setup() has always accepted that.
+// The free functions do not: at w0 >= T(pi) every shape designs an unstable
+// biquad (see angular_frequency).
 
 template <DspField T>
 BiquadCoefficients<T> lowpass(T w0, T q) noexcept {
